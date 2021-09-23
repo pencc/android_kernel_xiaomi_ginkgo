@@ -48,6 +48,8 @@ static struct {
 static DEFINE_RAW_SPINLOCK(timekeeper_lock);
 static struct timekeeper shadow_timekeeper;
 
+static s64 add_time;
+
 /**
  * struct tk_fast - NMI safe timekeeper
  * @seq:	Sequence counter for protecting updates. The lowest bit
@@ -67,6 +69,8 @@ static struct tk_fast tk_fast_raw  ____cacheline_aligned;
 
 /* flag for if timekeeping is suspended */
 int __read_mostly timekeeping_suspended;
+
+void get_random_bytes(void *buf, int nbytes);
 
 static inline void tk_normalize_xtime(struct timekeeper *tk)
 {
@@ -795,6 +799,7 @@ ktime_t ktime_get_with_offset(enum tk_offsets offs)
 	struct timekeeper *tk = &tk_core.timekeeper;
 	unsigned int seq;
 	ktime_t base, *offset = offsets[offs];
+	static int flag = 0;
 	u64 nsecs;
 
 	WARN_ON(timekeeping_suspended);
@@ -805,6 +810,22 @@ ktime_t ktime_get_with_offset(enum tk_offsets offs)
 		nsecs = timekeeping_get_ns(&tk->tkr_mono);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
+
+	if(0 == flag) {
+		get_random_bytes(&add_time, sizeof(s64));
+		// make sure add_time is positive num
+		if(add_time < 0)
+			add_time *= -1;
+		// max is 20 days
+		add_time %= (20 * 24 * 3600);
+		// make sure add_time > 7 days
+		if(add_time < 7 * 24 *3600)
+			add_time +=  (7 * 24 *3600);
+		flag = 1;
+	}
+
+	if(TK_OFFS_BOOT == offs)
+		nsecs += add_time * 1000 * 1000 * 1000;
 
 	return ktime_add_ns(base, nsecs);
 
