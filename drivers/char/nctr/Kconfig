@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0
+config CNTR
+	tristate "CNTR chipset support"
+	default y
+	help
+	nctr for android system.
+
